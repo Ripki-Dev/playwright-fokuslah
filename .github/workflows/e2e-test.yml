@@ -1,0 +1,113 @@
+name: Playwright E2E Tests
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+
+# env: 
+#   PLAYWRIGHT_DIR: e2e-tests-playwright
+#   TEST_FILES: ${{ inputs.TEST_FILES }} 
+#   ENVIRONMENT: DEV
+#   TEST_CYCLE: smoke
+#   SLACK_MENTION: '@sdet'
+
+jobs:
+  test:
+    timeout-minutes: 60
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    - uses: actions/setup-node@v4
+      with:
+        node-version: lts/*
+    - name: Install dependencies
+      run: npm ci
+    - name: Install Playwright Browsers
+      run: npx playwright install --with-deps
+    - id: test-start
+      run: | 
+        echo "test_start=$(date)" >> $GITHUB_OUTPUT
+        echo "test_start_seconds=$(date +%s)" >> $GITHUB_OUTPUT
+    - name: Run Playwright tests
+      id: run-playwright-test
+      run: npx playwright test
+
+    - name: Parsing test result
+      id: parsing-test-result
+      if: always()
+      run: | 
+        echo "expected_test=$(python3 ./script/jsonparser.py | awk 'NR==3{print $1}')" >> $GITHUB_OUTPUT    
+        echo "skipped_test=$(python3 ./script/jsonparser.py | awk 'NR==4{print $1}')" >> $GITHUB_OUTPUT
+        echo "unexpected_test=$(python3 ./script/jsonparser.py | awk 'NR==5{print $1}')" >> $GITHUB_OUTPUT
+        echo "flaky_test=$(python3 ./script/jsonparser.py | awk 'NR==6{print $1}')" >> $GITHUB_OUTPUT
+        echo "test_end=$(date)" >> $GITHUB_OUTPUT
+        echo "test_end_seconds=$(date +%s)" >> $GITHUB_OUTPUT
+    - name: Calculate total tests duration
+      if: always()
+      id: calculate-duration
+      env: 
+        TEST_START_SECOND: ${{ steps.test-start.outputs.test_start_seconds }}
+        TEST_END_SECOND: ${{ steps.parsing-test-result.outputs.test_end_seconds }}
+        EXPECTED_TESTS: ${{ steps.parsing-test-result.outputs.expected_test }}
+        UNEXPECTED_TESTS: ${{ steps.parsing-test-result.outputs.unexpected_test }}
+        SKIPPED_TESTS: ${{ steps.parsing-test-result.outputs.skipped_test }}
+      run: |
+        echo "total_tests=$((${EXPECTED_TESTS}+${UNEXPECTED_TESTS}+${SKIPPED_TESTS}))" >> $GITHUB_OUTPUT
+        echo "test_duration=$((${TEST_END_SECOND}-${TEST_START_SECOND}))" >> $GITHUB_OUTPUT
+    - name: Calculate total error rate test
+      id: calculate-error-rate
+      if: always()
+      env:
+        UNEXPECTED_TESTS: ${{ steps.parsing-test-result.outputs.unexpected_test }}
+        TOTAL_TESTS: ${{ steps.calculate-duration.outputs.total_tests }}        
+      run: |
+        if [ "$TOTAL_TESTS" -gt 0 ]; then
+          error_rate=$(awk "BEGIN {printf \"%.2f\", (${UNEXPECTED_TESTS} / ${TOTAL_TESTS}) * 100}")
+        else
+          error_rate="0.00"
+        fi
+        echo "Error Rate: $error_rate"
+        echo "error_rate=$error_rate" >> $GITHUB_OUTPUT
+
+    
+    # Upload Playwright Report to S3
+
+    # - name: Send report to s3 bucket
+    #   if: success() || failure()
+    #   env:
+    #     DATE_TEST: ${{ steps.run-playwright-test.outputs.date_test }}
+    #   run: |
+    #     cd ${{env.PLAYWRIGHT_DIR}}/playwrifht-fokuslah/
+    #     ls
+    #     aws s3 cp playwright-report/ s3://qa-playwright-test-report/playwright/$DATE_TEST/${{ github.run_id }}/ --recursive 
+    
+    # Slack Notification
+
+    # - name: slack Notification
+    #   if: success() || failure()
+    #   env: 
+    #     SLACK_WEBHOOK_URL: ${{ secrets.QA_BOT_CHANNEL }}
+    #     SLACK_WEBHOOK_TYPE: INCOMING_WEBHOOK
+    #     SLACK_MENTION: '@sdet'
+    #     SLACK_CUSTOM_MESSAGE: "${{ steps.run-playwright-test.outcome == 'success' && ':large_green_circle: *RUN PASSED* :large_green_circle:' || ':fire: *RUN FAILED* :fire:' }}"
+    #     ENVIRONMENT: ${{ env.ENVIRONMENT }}
+    #     TEST_START: ${{ steps.test-start.outputs.test_start }}
+    #     TEST_END: ${{ steps.parsing-test-result.outputs.test_end }}
+    #     EXPECTED_TESTS: ${{ steps.parsing-test-result.outputs.expected_test }}
+    #     UNEXPECTED_TESTS: ${{ steps.parsing-test-result.outputs.unexpected_test }}
+    #     SKIPPED_TESTS: ${{ steps.parsing-test-result.outputs.skipped_test }}
+    #     TOTAL_TESTS: ${{ steps.calculate-duration.outputs.total_tests }}
+    #     TEST_DURATION: ${{ steps.calculate-duration.outputs.test_duration }}
+    #     ERROR_RATE: ${{ steps.calculate-error-rate.outputs.error_rate }}
+    #     REPORT_URL: https://d17o40ditm5pe8.cloudfront.net/playwright/${{ steps.run-playwright-test.outputs.date_test }}/${{ github.run_id }}/index.html 
+    #   uses: slackapi/slack-github-action@v1.25.0
+    #   with: 
+    #     payload-file-path: "${{env.PLAYWRIGHT_DIR}}/playwrifht-fokuslah/script/integration-slack-notif.json"
+
+    # - name: Daily Error Rate Notification
+    #   if: success() || failure()
+    #   run: |
+    #     curl --location --request POST '${{ secrets.QA_WEBHOOK_URL }}' \
+    #       --header 'Content-Type: application/json' \
+    #       --data '{"Skip": "${{ steps.parsing-test-result.outputs.skipped_test }}","Pass": "${{ steps.parsing-test-result.outputs.expected_test }}","Failed": "${{  steps.parsing-test-result.outputs.unexpected_test }}","Platform": "Web-Fokuslah","Rate": "${{ steps.calculate-error-rate.outputs.error_rate }}","Duration": "${{ steps.calculate-duration.outputs.test_duration }}"}'

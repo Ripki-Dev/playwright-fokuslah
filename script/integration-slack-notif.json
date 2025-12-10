@@ -1,0 +1,70 @@
+{
+  "text": "*Playwright Test Result*",
+  "blocks": [
+    {
+      "type": "section",
+      "text": {
+        "type": "mrkdwn",
+        "text": "${{env.SLACK_CUSTOM_MESSAGE}}"
+      }
+    },
+    {
+      "type": "section",
+      "text": {
+        "type": "mrkdwn",
+        "text": "* KitaHQ E2E smoke test report at ${{env.TEST_START}}*"
+      }
+    },
+    {
+      "type": "section",
+      "text": {
+        "type": "mrkdwn",
+        "text": "_Environment:_ ${{env.ENVIRONMENT}} \n_Executed:_ ${{env.TOTAL_TESTS}} tests \n_Finished at:_ ${{env.TEST_END}} \n_Duration:_ ${{env.TEST_DURATION}} seconds"
+      }
+    },
+    {
+      "type": "divider"
+    },
+    {
+      "type": "section",
+      "text": {
+        "text": "Report *Total Summary*.",
+        "type": "mrkdwn"
+      }
+    },
+    {
+      "type": "section",
+      "text": {
+        "type": "mrkdwn",
+        "text": ":x: FAILED CASES ${{env.UNEXPECTED_TESTS}}  :white_check_mark: PASSED CASES ${{env.EXPECTED_TESTS}}  :warning: SKIPPED CASES ${{env.SKIPPED_TESTS}}  :gear: ERROR RATE ${{env.ERROR_RATE}}%"
+      }
+    },
+    {
+      "type": "divider"
+    },
+    {
+      "type": "section",
+      "text": {
+        "type": "mrkdwn",
+        "text": "${{env.SLACK_MENTION}}"
+      }
+    },
+    {
+      "type": "divider"
+    },
+    {
+      "type": "actions",
+      "elements": [
+        {
+          "type": "button",
+          "text": {
+            "type": "plain_text",
+            "text": "Open Playwright Test Report"
+          },
+          "value": "open_playwright_test_report",
+          "url": "${{env.REPORT_URL}}"
+        }
+      ]
+    }
+  ]
+}
