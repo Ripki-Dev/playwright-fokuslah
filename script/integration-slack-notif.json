@@ -12,7 +12,7 @@
       "type": "section",
       "text": {
         "type": "mrkdwn",
-        "text": "* KitaHQ E2E smoke test report at ${{env.TEST_START}}*"
+        "text": "* Fokuslah E2E smoke test report at ${{env.TEST_START}}*"
       }
     },
     {
