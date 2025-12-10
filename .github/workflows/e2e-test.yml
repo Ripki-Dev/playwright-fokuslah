@@ -32,43 +32,51 @@ jobs:
     - name: Run Playwright tests
       id: run-playwright-test
       run: npx playwright test
+    - uses: actions/upload-artifact@v4
+      if: ${{ !cancelled() }}
+      with:
+        name: playwright-report
+        path: playwright-report/
+        retention-days: 30
 
-    - name: Parsing test result
-      id: parsing-test-result
-      if: always()
-      run: | 
-        echo "expected_test=$(python3 ./script/jsonparser.py | awk 'NR==3{print $1}')" >> $GITHUB_OUTPUT    
-        echo "skipped_test=$(python3 ./script/jsonparser.py | awk 'NR==4{print $1}')" >> $GITHUB_OUTPUT
-        echo "unexpected_test=$(python3 ./script/jsonparser.py | awk 'NR==5{print $1}')" >> $GITHUB_OUTPUT
-        echo "flaky_test=$(python3 ./script/jsonparser.py | awk 'NR==6{print $1}')" >> $GITHUB_OUTPUT
-        echo "test_end=$(date)" >> $GITHUB_OUTPUT
-        echo "test_end_seconds=$(date +%s)" >> $GITHUB_OUTPUT
-    - name: Calculate total tests duration
-      if: always()
-      id: calculate-duration
-      env: 
-        TEST_START_SECOND: ${{ steps.test-start.outputs.test_start_seconds }}
-        TEST_END_SECOND: ${{ steps.parsing-test-result.outputs.test_end_seconds }}
-        EXPECTED_TESTS: ${{ steps.parsing-test-result.outputs.expected_test }}
-        UNEXPECTED_TESTS: ${{ steps.parsing-test-result.outputs.unexpected_test }}
-        SKIPPED_TESTS: ${{ steps.parsing-test-result.outputs.skipped_test }}
-      run: |
-        echo "total_tests=$((${EXPECTED_TESTS}+${UNEXPECTED_TESTS}+${SKIPPED_TESTS}))" >> $GITHUB_OUTPUT
-        echo "test_duration=$((${TEST_END_SECOND}-${TEST_START_SECOND}))" >> $GITHUB_OUTPUT
-    - name: Calculate total error rate test
-      id: calculate-error-rate
-      if: always()
-      env:
-        UNEXPECTED_TESTS: ${{ steps.parsing-test-result.outputs.unexpected_test }}
-        TOTAL_TESTS: ${{ steps.calculate-duration.outputs.total_tests }}        
-      run: |
-        if [ "$TOTAL_TESTS" -gt 0 ]; then
-          error_rate=$(awk "BEGIN {printf \"%.2f\", (${UNEXPECTED_TESTS} / ${TOTAL_TESTS}) * 100}")
-        else
-          error_rate="0.00"
-        fi
-        echo "Error Rate: $error_rate"
-        echo "error_rate=$error_rate" >> $GITHUB_OUTPUT
+    # test calculate for slack notification
+
+    # - name: Parsing test result
+    #   id: parsing-test-result
+    #   if: always()
+    #   run: | 
+    #     echo "expected_test=$(python3 ./script/jsonparser.py | awk 'NR==3{print $1}')" >> $GITHUB_OUTPUT    
+    #     echo "skipped_test=$(python3 ./script/jsonparser.py | awk 'NR==4{print $1}')" >> $GITHUB_OUTPUT
+    #     echo "unexpected_test=$(python3 ./script/jsonparser.py | awk 'NR==5{print $1}')" >> $GITHUB_OUTPUT
+    #     echo "flaky_test=$(python3 ./script/jsonparser.py | awk 'NR==6{print $1}')" >> $GITHUB_OUTPUT
+    #     echo "test_end=$(date)" >> $GITHUB_OUTPUT
+    #     echo "test_end_seconds=$(date +%s)" >> $GITHUB_OUTPUT
+    # - name: Calculate total tests duration
+    #   if: always()
+    #   id: calculate-duration
+    #   env: 
+    #     TEST_START_SECOND: ${{ steps.test-start.outputs.test_start_seconds }}
+    #     TEST_END_SECOND: ${{ steps.parsing-test-result.outputs.test_end_seconds }}
+    #     EXPECTED_TESTS: ${{ steps.parsing-test-result.outputs.expected_test }}
+    #     UNEXPECTED_TESTS: ${{ steps.parsing-test-result.outputs.unexpected_test }}
+    #     SKIPPED_TESTS: ${{ steps.parsing-test-result.outputs.skipped_test }}
+    #   run: |
+    #     echo "total_tests=$((${EXPECTED_TESTS}+${UNEXPECTED_TESTS}+${SKIPPED_TESTS}))" >> $GITHUB_OUTPUT
+    #     echo "test_duration=$((${TEST_END_SECOND}-${TEST_START_SECOND}))" >> $GITHUB_OUTPUT
+    # - name: Calculate total error rate test
+    #   id: calculate-error-rate
+    #   if: always()
+    #   env:
+    #     UNEXPECTED_TESTS: ${{ steps.parsing-test-result.outputs.unexpected_test }}
+    #     TOTAL_TESTS: ${{ steps.calculate-duration.outputs.total_tests }}        
+    #   run: |
+    #     if [ "$TOTAL_TESTS" -gt 0 ]; then
+    #       error_rate=$(awk "BEGIN {printf \"%.2f\", (${UNEXPECTED_TESTS} / ${TOTAL_TESTS}) * 100}")
+    #     else
+    #       error_rate="0.00"
+    #     fi
+    #     echo "Error Rate: $error_rate"
+    #     echo "error_rate=$error_rate" >> $GITHUB_OUTPUT
 
     
     # Upload Playwright Report to S3
